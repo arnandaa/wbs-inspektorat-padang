@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WBS Inspektorat Kota Padang - Whistleblowing System</title>
+    
+    <!-- Google Fonts: Public Sans (Headings) & Inter (Body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Public+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Link to Custom Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- HEADER & NAVIGATION -->
+    <header class="app-header">
+        <div class="header-container">
+            <a href="#" class="logo-area" onclick="navigateTo('home')">
+                <!-- Logo Pemko Padang -->
+                <img class="header-logo" src="logo_padang.svg" alt="Logo Pemko Padang" width="40" height="40">
+                <div class="logo-text">
+                    <span class="logo-title">WBS</span>
+                    <span class="logo-subtitle">Inspektorat Kota Padang</span>
+                </div>
+            </a>
+            
+            <nav class="nav-links">
+                <a href="#" class="nav-item active" id="nav-home" onclick="navigateTo('home')">Beranda</a>
+                <a href="#" class="nav-item" id="nav-report" onclick="navigateTo('report')">Buat Aduan</a>
+                <a href="#" class="nav-item" id="nav-track" onclick="navigateTo('track')">Lacak Laporan</a>
+                <a href="#" class="nav-item" id="nav-admin" onclick="openAdminPortal()">Admin Area</a>
+            </nav>
+            
+            <!-- Mobile Menu Toggle -->
+            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- Mobile Dropdown Navigation -->
+        <div class="mobile-nav" id="mobile-nav">
+            <a href="#" class="mobile-nav-item" onclick="navigateTo('home'); toggleMobileMenu()">Beranda</a>
+            <a href="#" class="mobile-nav-item" onclick="navigateTo('report'); toggleMobileMenu()">Buat Aduan</a>
+            <a href="#" class="mobile-nav-item" onclick="navigateTo('track'); toggleMobileMenu()">Lacak Laporan</a>
+            <a href="#" class="mobile-nav-item" onclick="openAdminPortal(); toggleMobileMenu()">Admin Area</a>
+        </div>
+    </header>
+
+    <!-- MAIN APP CONTAINER -->
+    <main class="app-main">
+        
+        <!-- 1. LANDING PAGE SECTION -->
+        <section id="section-home" class="app-section active-section">
+            <div class="hero-container">
+                <div class="hero-content">
+                    <div class="badge-new">Portal Whistleblowing System Resmi</div>
+                    <h1 class="hero-title">Wujudkan Pemerintahan Kota Padang Bersih & Berintegritas</h1>
+                    <p class="hero-desc">Mendengar, Menjaga, Menindaklanjuti. Laporkan tindakan pelanggaran, korupsi, pungutan liar, atau gratifikasi yang terjadi di lingkungan Pemerintah Kota Padang secara aman dan terlindungi.</p>
+                    <div class="hero-actions">
+                        <button class="btn btn-primary btn-lg" onclick="navigateTo('report')">
+                            Buat Laporan Baru
+                            <svg class="btn-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        </button>
+                        <button class="btn btn-secondary btn-lg" onclick="navigateTo('track')">
+                            Lacak Laporan
+                            <svg class="btn-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="hero-stats-card">
+                    <div class="stats-card-inner">
+                        <div class="stats-header">
+                            <h3>Statistik Laporan WBS</h3>
+                            <span class="pulse-dot"></span>
+                        </div>
+                        <p class="stats-subtitle">Data diperbarui secara real-time</p>
+                        
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <span class="stat-number text-navy" id="stat-total">0</span>
+                                <span class="stat-label">Total Masuk</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number text-orange" id="stat-pending">0</span>
+                                <span class="stat-label">Diverifikasi</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number text-blue" id="stat-process">0</span>
+                                <span class="stat-label">Ditindaklanjuti</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number text-green" id="stat-resolved">0</span>
+                                <span class="stat-label">Selesai</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECURITY GUARANTEE / WHITESPACE -->
+            <div class="home-divider"></div>
+
+            <div class="security-banner">
+                <div class="banner-icon-container">
+                    <svg viewBox="0 0 24 24" width="48" height="48" stroke="var(--color-accent)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                </div>
+                <div class="banner-text">
+                    <h2>Kerahasiaan Anda Dijamin 100%</h2>
+                    <p>Kami menjamin identitas Anda dilindungi secara ketat. Anda memiliki pilihan untuk melaporkan secara anonim tanpa mengurangi bobot penanganan laporan Anda oleh Tim Inspektorat.</p>
+                </div>
+            </div>
+
+            <!-- INFOGRAPHICS / HOW IT WORKS -->
+            <div class="workflow-section">
+                <h2 class="section-title text-center">Bagaimana Cara Kerja WBS?</h2>
+                <p class="section-subtitle text-center">4 langkah mudah untuk melaporkan dan mengawal integritas Kota Padang</p>
+                
+                <div class="workflow-grid">
+                    <div class="workflow-card">
+                        <div class="step-num">01</div>
+                        <h3>Kirim Aduan</h3>
+                        <p>Isi formulir pengaduan secara anonim atau dengan data diri secara jujur dan lampirkan bukti pendukung.</p>
+                    </div>
+                    <div class="workflow-card">
+                        <div class="step-num">02</div>
+                        <h3>Dapatkan Token</h3>
+                        <p>Simpan Token Aduan unik yang digenerate oleh sistem untuk melacak perkembangan status laporan Anda.</p>
+                    </div>
+                    <div class="workflow-card">
+                        <div class="step-num">03</div>
+                        <h3>Pemeriksaan Internal</h3>
+                        <p>Inspektorat meneliti kelayakan laporan dan melakukan verifikasi lapangan serta investigasi mendalam.</p>
+                    </div>
+                    <div class="workflow-card">
+                        <div class="step-num">04</div>
+                        <h3>Tindak Lanjut & Selesai</h3>
+                        <p>Laporan yang terbukti ditindaklanjuti secara disiplin/hukum, dan pelapor menerima hasil laporan via halaman Lacak.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TYPES OF VIOLATIONS -->
+            <div class="violations-section">
+                <h2 class="section-title text-center">Jenis Pelanggaran yang Dapat Dilaporkan</h2>
+                <div class="violations-grid">
+                    <div class="violation-card">
+                        <div class="violation-icon">⚖️</div>
+                        <h3>Tindakan Korupsi</h3>
+                        <p>Penyalahgunaan uang negara atau fasilitas daerah demi keuntungan pribadi atau golongan tertentu.</p>
+                    </div>
+                    <div class="violation-card">
+                        <div class="violation-icon">💸</div>
+                        <h3>Pungutan Liar (Pungli)</h3>
+                        <p>Permintaan biaya di luar ketentuan resmi pada pelayanan publik atau perizinan daerah.</p>
+                    </div>
+                    <div class="violation-card">
+                        <div class="violation-icon">🎁</div>
+                        <h3>Gratifikasi</h3>
+                        <p>Penerimaan hadiah, janji, atau fasilitas oleh ASN yang berhubungan dengan jabatan atau kewenangannya.</p>
+                    </div>
+                    <div class="violation-card">
+                        <div class="violation-icon">🤝</div>
+                        <h3>Benturan Kepentingan</h3>
+                        <p>Situasi di mana ASN mengambil keputusan dengan adanya kepentingan pribadi atau keluarga.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. REPORT FORM SECTION -->
+        <section id="section-report" class="app-section">
+            <div class="form-wrapper">
+                <div class="form-header">
+                    <h2>Formulir Pengaduan WBS</h2>
+                    <p>Silakan isi informasi dugaan pelanggaran secara lengkap dan akurat di bawah ini.</p>
+                </div>
+                
+                <form id="wbs-report-form" onsubmit="handleFormSubmit(event)">
+                    <!-- ANONYMOUS TOGGLE WIDGET -->
+                    <div class="toggle-card">
+                        <div class="toggle-info">
+                            <span class="toggle-label-text">Laporkan Secara Anonim</span>
+                            <span class="toggle-desc-text">Aktifkan untuk menyembunyikan identitas asli Anda dari publik maupun pihak administrasi.</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="toggle-anonim" onchange="toggleIdentityFields(this.checked)" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
+                    <!-- IDENTITY FIELDS (Hidden by default when toggle-anonim is checked) -->
+                    <div id="identity-fields-container" class="identity-section hidden">
+                        <h3 class="section-subheading">Data Diri Pelapor</h3>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label for="pelapor-nama">Nama Lengkap <span class="required-star">*</span></label>
+                                <input type="text" id="pelapor-nama" placeholder="Masukkan nama lengkap sesuai KTP">
+                            </div>
+                            <div class="form-group">
+                                <label for="pelapor-nik">Nomor Induk Kependudukan (NIK) <span class="required-star">*</span></label>
+                                <input type="text" id="pelapor-nik" placeholder="16 digit NIK Anda" maxlength="16">
+                            </div>
+                        </div>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label for="pelapor-email">Alamat Email <span class="required-star">*</span></label>
+                                <input type="email" id="pelapor-email" placeholder="contoh@domain.com">
+                            </div>
+                            <div class="form-group">
+                                <label for="pelapor-hp">Nomor Handphone / WhatsApp <span class="required-star">*</span></label>
+                                <input type="text" id="pelapor-hp" placeholder="Contoh: 081234567890">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COMPLAINT DETAILS SECTION -->
+                    <div class="complaint-section">
+                        <h3 class="section-subheading">Rincian Aduan & Pelanggaran</h3>
+                        
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label for="aduan-kategori">Jenis Pelanggaran <span class="required-star">*</span></label>
+                                <select id="aduan-kategori" required>
+                                    <option value="" disabled selected>Pilih jenis dugaan pelanggaran</option>
+                                    <option value="Korupsi">Tindakan Korupsi / Kerugian Keuangan Negara</option>
+                                    <option value="Pungli">Pungutan Liar (Pungli) pada Pelayanan Publik</option>
+                                    <option value="Gratifikasi">Gratifikasi / Penerimaan Hadiah & Suap</option>
+                                    <option value="Benturan Kepentingan">Benturan Kepentingan Jabatan</option>
+                                    <option value="Penyalahgunaan Wewenang">Penyalahgunaan Wewenang / Jabatan</option>
+                                    <option value="Pelanggaran Disiplin">Pelanggaran Disiplin / Kode Etik ASN</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="aduan-judul">Judul Pengaduan <span class="required-star">*</span></label>
+                                <input type="text" id="aduan-judul" placeholder="Tuliskan ringkasan pokok aduan Anda" required>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label for="aduan-tanggal">Tanggal Kejadian <span class="required-star">*</span></label>
+                                <input type="date" id="aduan-tanggal" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="aduan-lokasi">Lokasi / Dinas Terkait (OPD) <span class="required-star">*</span></label>
+                                <input type="text" id="aduan-lokasi" placeholder="Contoh: Kantor Dinas Perhubungan Kota Padang" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="aduan-deskripsi">Deskripsi & Kronologi Kejadian <span class="required-star">*</span></label>
+                            <textarea id="aduan-deskripsi" rows="6" placeholder="Ceritakan secara detail mengenai dugaan pelanggaran yang terjadi (Siapa, Kapan, Di mana, Apa yang terjadi, dan Bagaimana caranya)" required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="aduan-bukti">Unggah Bukti Pendukung (Opsional)</label>
+                            <div class="file-upload-zone" id="file-upload-zone">
+                                <input type="file" id="aduan-bukti" class="file-input" onchange="handleFileSelect(event)">
+                                <svg viewBox="0 0 24 24" width="40" height="40" stroke="#64748b" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" class="upload-icon">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                                <span class="upload-text">Tarik berkas ke sini atau <strong class="text-navy">Pilih Berkas</strong></span>
+                                <span class="upload-hint">Format yang diperbolehkan: PDF, JPG, PNG, DOCX (Maksimal 5MB)</span>
+                                <div id="selected-file-display" class="selected-file-display hidden">
+                                    <span class="file-name" id="selected-file-name">file_name.pdf</span>
+                                    <button type="button" class="btn-remove-file" onclick="removeSelectedFile(event)">Hapus</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FORM SUBMIT -->
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" onclick="navigateTo('home')">Batalkan</button>
+                        <button type="submit" class="btn btn-primary">
+                            Kirim Pengaduan
+                            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- 3. TRACK REPORT SECTION -->
+        <section id="section-track" class="app-section">
+            <div class="track-wrapper">
+                <div class="track-search-card">
+                    <div class="form-header text-center">
+                        <h2>Lacak Status Pengaduan Anda</h2>
+                        <p>Masukkan Token Aduan unik yang Anda dapatkan setelah mengirim laporan untuk memantau status pemeriksaan.</p>
+                    </div>
+                    
+                    <form onsubmit="handleTrackReport(event)" class="track-search-form">
+                        <div class="track-input-group">
+                            <input type="text" id="track-token-input" placeholder="Contoh: WBS-PDG-2026-X79K2" required>
+                            <button type="submit" class="btn btn-primary btn-search">
+                                Cari
+                                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            </button>
+                        </div>
+                        <span id="track-error-msg" class="track-error-msg hidden">Token aduan tidak ditemukan. Silakan cek kembali kode Anda.</span>
+                    </form>
+                </div>
+
+                <!-- TRACK RESULTS (Hidden until search is successful) -->
+                <div id="track-results-container" class="track-results-container hidden">
+                    
+                    <div class="results-header-card">
+                        <div class="results-header-info">
+                            <span class="report-token-badge" id="display-token">WBS-PDG-2026-XXXXX</span>
+                            <h3 id="display-judul">Dugaan Kasus Pungutan Liar Layanan Parkir</h3>
+                            <p class="display-meta">Diajukan pada: <span id="display-tanggal-masuk">12 Juni 2026</span> • Kategori: <strong id="display-kategori">Pungli</strong></p>
+                        </div>
+                        <div class="results-header-status">
+                            <span class="status-badge" id="display-status-badge">Diajukan</span>
+                        </div>
+                    </div>
+
+                    <!-- TIMELINE BAR -->
+                    <div class="timeline-card">
+                        <h3>Timeline Progress Pengaduan</h3>
+                        
+                        <div class="timeline-steps">
+                            <!-- Step 1: Diajukan -->
+                            <div class="timeline-step" id="step-diajukan">
+                                <div class="step-circle">1</div>
+                                <div class="step-content">
+                                    <h4>Laporan Diajukan</h4>
+                                    <p class="step-date" id="date-diajukan">12 Juni 2026</p>
+                                    <p class="step-desc">Laporan Anda telah berhasil masuk ke dalam database kami.</p>
+                                </div>
+                            </div>
+
+                            <!-- Step 2: Diverifikasi -->
+                            <div class="timeline-step" id="step-diverifikasi">
+                                <div class="step-circle">2</div>
+                                <div class="step-content">
+                                    <h4>Diverifikasi</h4>
+                                    <p class="step-date" id="date-diverifikasi">-</p>
+                                    <p class="step-desc">Inspektorat meninjau keabsahan laporan dan bukti pendukung.</p>
+                                </div>
+                            </div>
+
+                            <!-- Step 3: Ditindaklanjuti -->
+                            <div class="timeline-step" id="step-ditindaklanjuti">
+                                <div class="step-circle">3</div>
+                                <div class="step-content">
+                                    <h4>Ditindaklanjuti</h4>
+                                    <p class="step-date" id="date-ditindaklanjuti">-</p>
+                                    <p class="step-desc">Investigasi internal/lapangan dijalankan oleh tim pemeriksa.</p>
+                                </div>
+                            </div>
+
+                            <!-- Step 4: Selesai -->
+                            <div class="timeline-step" id="step-selesai">
+                                <div class="step-circle">4</div>
+                                <div class="step-content">
+                                    <h4>Selesai / Ditutup</h4>
+                                    <p class="step-date" id="date-selesai">-</p>
+                                    <p class="step-desc">Pemeriksaan disimpulkan dan tindakan tegas diambil jika terbukti.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- REPORT DETAILS (REDACTED FOR SECURITY) -->
+                    <div class="report-details-card">
+                        <h3>Detail Laporan Aduan</h3>
+                        <div class="detail-grid">
+                            <div class="detail-row">
+                                <span class="detail-label">Identitas Pelapor</span>
+                                <span class="detail-value text-bold" id="display-pelapor-nama">Anonim (Dirahasiakan)</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Tanggal Kejadian</span>
+                                <span class="detail-value" id="display-tanggal-kejadian">10 Juni 2026</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Lokasi Kejadian</span>
+                                <span class="detail-value" id="display-lokasi">Kantor Dinas Pariwisata Kota Padang</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Kronologi Kejadian</span>
+                                <span class="detail-value text-justify" id="display-deskripsi">Deskripsi kronologi lengkap aduan dari pelapor.</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Bukti Pendukung</span>
+                                <span class="detail-value" id="display-bukti-link">Tidak ada bukti file dilampirkan.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ADMIN RESPONSES LOG -->
+                    <div class="admin-response-card">
+                        <h3>Catatan Tanggapan Inspektorat</h3>
+                        <div class="response-list" id="track-response-list">
+                            <div class="response-empty">Belum ada tanggapan atau catatan penanganan dari admin.</div>
+                        </div>
+                        
+                        <!-- WHISTLEBLOWER FOLLOW UP COMMENT -->
+                        <div class="whistleblower-comment-form">
+                            <h4>Kirim Pesan Tambahan ke Inspektorat</h4>
+                            <p class="comment-hint">Gunakan formulir ini untuk menambahkan bukti atau informasi tambahan bagi proses penelaahan.</p>
+                            <form onsubmit="handleSendWhistleblowerComment(event)">
+                                <input type="hidden" id="comment-report-token">
+                                <textarea id="comment-message-input" rows="3" placeholder="Tulis informasi tambahan di sini..." required></textarea>
+                                <button type="submit" class="btn btn-secondary btn-sm">Kirim Informasi Tambahan</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. ADMIN DASHBOARD SECTION -->
+        <section id="section-admin" class="app-section">
+            <div class="admin-dashboard-container">
+                <!-- Admin Sidebar / Quick Filters -->
+                <aside class="admin-sidebar">
+                    <div class="admin-profile">
+                        <div class="admin-avatar">A</div>
+                        <div class="admin-info">
+                            <h4>Admin Inspektorat</h4>
+                            <span>Petugas WBS</span>
+                        </div>
+                    </div>
+                    
+                    <nav class="admin-nav">
+                        <a href="#" class="admin-nav-item active" id="admin-filter-all" onclick="filterAdminReports('all')">
+                            <span>Semua Aduan</span>
+                            <span class="badge badge-neutral" id="admin-badge-all">0</span>
+                        </a>
+                        <a href="#" class="admin-nav-item" id="admin-filter-diajukan" onclick="filterAdminReports('Diajukan')">
+                            <span>Diajukan (Baru)</span>
+                            <span class="badge badge-orange" id="admin-badge-diajukan">0</span>
+                        </a>
+                        <a href="#" class="admin-nav-item" id="admin-filter-diverifikasi" onclick="filterAdminReports('Diverifikasi')">
+                            <span>Diverifikasi</span>
+                            <span class="badge badge-yellow" id="admin-badge-diverifikasi">0</span>
+                        </a>
+                        <a href="#" class="admin-nav-item" id="admin-filter-ditindaklanjuti" onclick="filterAdminReports('Ditindaklanjuti')">
+                            <span>Ditindaklanjuti</span>
+                            <span class="badge badge-blue" id="admin-badge-ditindaklanjuti">0</span>
+                        </a>
+                        <a href="#" class="admin-nav-item" id="admin-filter-selesai" onclick="filterAdminReports('Selesai')">
+                            <span>Selesai</span>
+                            <span class="badge badge-green" id="admin-badge-selesai">0</span>
+                        </a>
+                        <a href="#" class="admin-nav-item" id="admin-filter-ditolak" onclick="filterAdminReports('Ditolak')">
+                            <span>Ditolak</span>
+                            <span class="badge badge-red" id="admin-badge-ditolak">0</span>
+                        </a>
+                    </nav>
+                    
+                    <button class="btn btn-outline-danger admin-logout-btn" onclick="logoutAdmin()">Keluar Admin Area</button>
+                </aside>
+
+                <!-- Admin Main Workspace -->
+                <div class="admin-workspace">
+                    <div class="workspace-header">
+                        <h2>Dashboard Pengelolaan Pengaduan</h2>
+                        <div class="workspace-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="resetMockData()">Kosongkan Semua Data</button>
+                        </div>
+                    </div>
+                    
+                    <!-- ADMIN STATS GRID -->
+                    <div class="admin-stats-grid">
+                        <div class="admin-stat-card border-left-orange">
+                            <span class="admin-stat-val" id="admin-stat-total">0</span>
+                            <span class="admin-stat-lbl">Total Pengaduan</span>
+                        </div>
+                        <div class="admin-stat-card border-left-yellow">
+                            <span class="admin-stat-val" id="admin-stat-pending">0</span>
+                            <span class="admin-stat-lbl">Laporan Baru (Diajukan)</span>
+                        </div>
+                        <div class="admin-stat-card border-left-blue">
+                            <span class="admin-stat-val" id="admin-stat-process">0</span>
+                            <span class="admin-stat-lbl">Sedang Ditindaklanjuti</span>
+                        </div>
+                        <div class="admin-stat-card border-left-green">
+                            <span class="admin-stat-val" id="admin-stat-resolved">0</span>
+                            <span class="admin-stat-lbl">Selesai Ditutup</span>
+                        </div>
+                    </div>
+                    
+                    <!-- SLA PERFORMANCE DASHBOARD -->
+                    <div class="admin-stats-grid" id="sla-performance-dashboard" style="margin-top: var(--space-md); margin-bottom: var(--space-md);">
+                        <div class="admin-stat-card border-left-blue">
+                            <span class="admin-stat-val" id="sla-compliance-rate">0%</span>
+                            <span class="admin-stat-lbl">Kepatuhan SLA (Tepat Waktu)</span>
+                        </div>
+                        <div class="admin-stat-card border-left-green">
+                            <span class="admin-stat-val" id="sla-stat-safe">0</span>
+                            <span class="admin-stat-lbl">Aduan Tepat Waktu</span>
+                        </div>
+                        <div class="admin-stat-card border-left-orange">
+                            <span class="admin-stat-val" id="sla-stat-warning">0</span>
+                            <span class="admin-stat-lbl">Jatuh Tempo Hari Ini</span>
+                        </div>
+                        <div class="admin-stat-card border-left-red">
+                            <span class="admin-stat-val" id="sla-stat-overdue">0</span>
+                            <span class="admin-stat-lbl">Terlambat (Melewati Batas)</span>
+                        </div>
+                    </div>
+                    
+                    <!-- DATA TABLE CARD -->
+                    <div class="admin-table-card">
+                        <div class="table-card-header">
+                            <h3>Daftar Pengaduan WBS</h3>
+                            <div class="search-box">
+                                <input type="text" id="admin-search-input" placeholder="Cari token, judul, atau OPD..." onkeyup="handleAdminSearch(this.value)">
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Token</th>
+                                        <th>Tanggal Masuk</th>
+                                        <th>Kategori</th>
+                                        <th>Judul Aduan</th>
+                                        <th>OPD Terkait</th>
+                                        <th>Tipe Pelapor</th>
+                                        <th>Status</th>
+                                        <th class="sla-th">Batas SLA</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-table-body">
+                                    <!-- Rows will be dynamically loaded via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="app-footer">
+        <div class="footer-container">
+            <div class="footer-info">
+                <h3>Inspektorat Kota Padang</h3>
+                <p>Jl. Bagindo Aziz Chan No. 1, Aie Pacah, Kec. Koto Tangah, Kota Padang, Sumatera Barat</p>
+                <p>Email: <a href="mailto:inspektorat@padang.go.id">inspektorat@padang.go.id</a> | Telp: (0751) 461011</p>
+            </div>
+            <div class="footer-links">
+                <a href="#" onclick="navigateTo('home')">Beranda</a> • 
+                <a href="#" onclick="navigateTo('report')">Buat Aduan</a> • 
+                <a href="#" onclick="navigateTo('track')">Lacak Laporan</a> • 
+                <a href="#" onclick="openAdminPortal()">Admin Area</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Inspektorat Kota Padang. Hak Cipta Dilindungi Undang-Undang.</p>
+        </div>
+    </footer>
+
+    <!-- MODAL 1: NOTIFICATION SUCCESS COMPLAINT -->
+    <div id="modal-success" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-icon text-green">
+                <svg viewBox="0 0 24 24" width="60" height="60" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+            </div>
+            <h2>Laporan Pengaduan Berhasil Dikirim!</h2>
+            <p>Terima kasih atas kepedulian Anda dalam menjaga integritas di lingkungan Kota Padang. Laporan Anda telah kami terima.</p>
+            
+            <div class="token-container">
+                <span class="token-label">SIMPAN TOKEN INI UNTUK MELACAK LAPORAN:</span>
+                <div class="token-display">
+                    <span id="success-token-val">WBS-PDG-2026-XXXXX</span>
+                    <button class="btn-copy" onclick="copyTokenToClipboard()">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="copy-icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        Salin
+                    </button>
+                </div>
+                <span id="copy-status-msg" class="copy-status-msg">Berhasil disalin!</span>
+            </div>
+
+            <div class="modal-warning">
+                <strong>PENTING:</strong> Catat atau salin token di atas. Demi keamanan, token ini hanya muncul sekali ini dan tidak dapat dicari berdasarkan data diri jika Anda melapor secara anonim.
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-primary btn-block" onclick="closeSuccessModal()">Tutup dan Lacak Aduan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ADMIN LOGIN PORTAL -->
+    <div id="modal-admin-login" class="modal-overlay">
+        <div class="modal-card modal-card-sm">
+            <button class="modal-close" onclick="closeAdminLoginModal()">&times;</button>
+            <div class="form-header text-center">
+                <h2>Portal Admin Inspektorat</h2>
+                <p>Khusus untuk petugas pemeriksa Inspektorat Kota Padang.</p>
+            </div>
+            
+            <form onsubmit="handleAdminLogin(event)">
+                <div class="form-group">
+                    <label for="admin-username">Username <span class="required-star">*</span></label>
+                    <input type="text" id="admin-username" placeholder="Masukkan username admin" required>
+                </div>
+                <div class="form-group">
+                    <label for="admin-password">Password <span class="required-star">*</span></label>
+                    <input type="password" id="admin-password" placeholder="Masukkan password admin" required>
+                    <span id="login-error-msg" class="login-error-msg hidden">Username atau Password Salah!</span>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Masuk Dashboard</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: ADMIN DETAIL ADUAN & EDIT STATUS -->
+    <div id="modal-admin-detail" class="modal-overlay">
+        <div class="modal-card modal-card-lg">
+            <button class="modal-close" onclick="closeAdminDetailModal()">&times;</button>
+            <div class="admin-detail-header">
+                <h2>Rincian Pengaduan WBS</h2>
+                <span class="report-token-badge" id="admin-detail-token">WBS-PDG-2026-XXXXX</span>
+            </div>
+            
+            <div class="admin-detail-body">
+                <div class="admin-detail-col-left">
+                    <div class="detail-block">
+                        <h3>Informasi Pengaduan</h3>
+                        <div class="admin-detail-table">
+                            <div class="admin-detail-row">
+                                <span class="lbl">Tanggal Pengaduan</span>
+                                <span class="val" id="admin-detail-date">12 Juni 2026</span>
+                            </div>
+                            <div class="admin-detail-row">
+                                <span class="lbl">Kategori Aduan</span>
+                                <span class="val" id="admin-detail-cat">Gratifikasi</span>
+                            </div>
+                            <div class="admin-detail-row">
+                                <span class="lbl">Judul Laporan</span>
+                                <span class="val text-bold" id="admin-detail-title">Judul Laporan</span>
+                            </div>
+                            <div class="admin-detail-row">
+                                <span class="lbl">OPD Terkait</span>
+                                <span class="val" id="admin-detail-opd">Kantor OPD</span>
+                            </div>
+                            <div class="admin-detail-row">
+                                <span class="lbl">Tanggal Kejadian</span>
+                                <span class="val" id="admin-detail-incident-date">10 Juni 2026</span>
+                            </div>
+                            <div class="admin-detail-row">
+                                <span class="lbl">Status & Batas SLA</span>
+                                <span class="val" id="admin-detail-sla">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-block">
+                        <h3>Identitas Pelapor</h3>
+                        <div class="admin-detail-table">
+                            <div class="admin-detail-row">
+                                <span class="lbl">Tipe Pelaporan</span>
+                                <span class="val" id="admin-detail-reporter-type">Anonim</span>
+                            </div>
+                            <div class="admin-detail-row">
+                                <span class="lbl">Nama Pelapor</span>
+                                <span class="val text-bold" id="admin-detail-reporter-name">Anonim</span>
+                            </div>
+                            <div class="admin-detail-row">
+                                <span class="lbl">NIK</span>
+                                <span class="val" id="admin-detail-reporter-nik">-</span>
+                            </div>
+                            <div class="admin-detail-row">
+                                <span class="lbl">Email / No. HP</span>
+                                <span class="val" id="admin-detail-reporter-contact">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-block">
+                        <h3>Kronologi Kejadian</h3>
+                        <div class="admin-detail-desc" id="admin-detail-desc">
+                            Kronologi detail.
+                        </div>
+                    </div>
+
+                    <div class="detail-block">
+                        <h3>Bukti Lampiran</h3>
+                        <div class="admin-detail-file" id="admin-detail-file">
+                            Tidak ada bukti dilampirkan.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-detail-col-right">
+                    <div class="action-block">
+                        <h3>Ubah Status Aduan</h3>
+                        <form onsubmit="handleAdminUpdateStatus(event)">
+                            <input type="hidden" id="admin-update-token">
+                            
+                            <div class="form-group">
+                                <label for="admin-status-select">Status Pengaduan</label>
+                                <select id="admin-status-select" class="form-control" required>
+                                    <option value="Diajukan">Diajukan (Baru)</option>
+                                    <option value="Diverifikasi">Diverifikasi (Proses Awal)</option>
+                                    <option value="Ditindaklanjuti">Ditindaklanjuti (Investigasi)</option>
+                                    <option value="Selesai">Selesai (Ditutup)</option>
+                                    <option value="Ditolak">Ditolak</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="admin-response-text">Tambahkan Catatan / Tanggapan Resmi</label>
+                                <textarea id="admin-response-text" rows="5" placeholder="Tuliskan perkembangan kasus, permintaan klarifikasi, atau hasil penyidikan di sini..." required></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="admin-response-file">Lampirkan Dokumen/Klarifikasi Resmi (Opsional)</label>
+                                <input type="file" id="admin-response-file" class="form-control" onchange="handleAdminFileSelect(event)">
+                                <span class="upload-hint" style="font-size: 0.75rem; color: var(--color-text-muted); display: block; margin-top: 0.2rem;">
+                                    Format: PDF, JPG, PNG, MP4, MOV, HEIC (Maksimal 5MB)
+                                </span>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary btn-block">Simpan & Perbarui Status</button>
+                        </form>
+                    </div>
+
+                    <div class="action-block margin-top-lg">
+                        <h3>Riwayat Tanggapan Kasus</h3>
+                        <div class="admin-history-timeline" id="admin-detail-history-list">
+                            <!-- Loaded Dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Link to JavaScript logic -->
+    <script src="app.js"></script>
+</body>
+</html>

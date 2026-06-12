@@ -1,0 +1,14 @@
+{
+  "name": "wbs-inspektorat-padang",
+  "version": "1.0.0",
+  "description": "Whistleblowing System Inspektorat Kota Padang",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.1"
+  }
+}

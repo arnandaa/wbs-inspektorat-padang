@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Environment variables (JANGAN di-push ke GitHub!)
+.env
+
+# Database files
+wbs_database.db
+*.db-journal
+reports.json
+
+# Log files
+server.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
