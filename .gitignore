@@ -8,6 +8,7 @@ node_modules/
 wbs_database.db
 *.db-journal
 reports.json
+reports_backup.json
 
 # Log files
 server.log

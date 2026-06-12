@@ -6,19 +6,11 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const https = require('https');
-const Database = require('better-sqlite3');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
-
-const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'wbs_database.db');
 const LOG_FILE = path.join(__dirname, 'server.log');
-
-// Ensure parent directory of DB_PATH exists (crucial when using Docker/Railway Volumes)
-const dbDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-}
 
 // Cryptographically secure active sessions storage (in-memory)
 const activeSessions = new Set();
@@ -39,98 +31,125 @@ function writeLog(level, message) {
     console.log(`[${level}] ${message}`);
 }
 
-/* ==========================================================================
-   SQLite DATABASE INITIALIZATION
-   ========================================================================== */
-
-const db = new Database(DB_PATH);
-
-// Enable WAL mode for better concurrent read performance
-db.pragma('journal_mode = WAL');
-
-// Create tables if they don't exist
-db.exec(`
-    CREATE TABLE IF NOT EXISTS reports (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        token TEXT UNIQUE NOT NULL,
-        date_submitted TEXT NOT NULL,
-        is_anonim INTEGER NOT NULL DEFAULT 1,
-        category TEXT NOT NULL,
-        title TEXT NOT NULL,
-        incident_date TEXT,
-        location TEXT NOT NULL,
-        description TEXT NOT NULL,
-        file_name TEXT,
-        file_data TEXT,
-        status TEXT NOT NULL DEFAULT 'Diajukan',
-        reporter_name TEXT,
-        reporter_nik TEXT,
-        reporter_email TEXT,
-        reporter_hp TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS report_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        report_token TEXT NOT NULL,
-        status TEXT NOT NULL,
-        note TEXT,
-        date TEXT NOT NULL,
-        is_user_msg INTEGER NOT NULL DEFAULT 0,
-        file_name TEXT,
-        file_data TEXT,
-        FOREIGN KEY (report_token) REFERENCES reports(token)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_reports_token ON reports(token);
-    CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
-    CREATE INDEX IF NOT EXISTS idx_history_token ON report_history(report_token);
-`);
-
-writeLog('SYSTEM', 'SQLite database initialized successfully.');
-
-// Startup diagnostics: log environment variable status
-writeLog('SYSTEM', `ENV CHECK — TELEGRAM_BOT_TOKEN: ${process.env.TELEGRAM_BOT_TOKEN ? 'SET ✓' : 'NOT SET (using fallback)'}`);
-writeLog('SYSTEM', `ENV CHECK — TELEGRAM_CHAT_ID: ${process.env.TELEGRAM_CHAT_ID ? 'SET ✓' : 'NOT SET (using fallback)'}`);
-writeLog('SYSTEM', `ENV CHECK — ADMIN_USERNAME: ${process.env.ADMIN_USERNAME ? 'SET ✓' : 'NOT SET (using fallback)'}`);
-writeLog('SYSTEM', `ENV CHECK — PORT: ${process.env.PORT || '8000 (default)'}`);
+// Error formatting helper to handle Node AggregateError (e.g. for connection errors)
+function formatError(err) {
+    if (!err) return 'Unknown error';
+    if (err.errors && Array.isArray(err.errors)) {
+        return err.errors.map(e => e.message).join('; ');
+    }
+    return err.message || err.toString();
+}
 
 /* ==========================================================================
-   AUTO-MIGRATION: Import existing reports.json data into SQLite
+   PostgreSQL DATABASE INITIALIZATION
    ========================================================================== */
 
-function migrateFromJson() {
-    const JSON_FILE = path.join(__dirname, 'reports.json');
+// Handle SSL requirements for hosted databases (like Railway/Supabase/Neon)
+const sslConfig = process.env.DATABASE_URL && 
+                  !process.env.DATABASE_URL.includes('localhost') && 
+                  !process.env.DATABASE_URL.includes('127.0.0.1')
+    ? { rejectUnauthorized: false }
+    : false;
+
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: sslConfig
+});
+
+async function initDb() {
+    const client = await pool.connect();
+    try {
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS reports (
+                id SERIAL PRIMARY KEY,
+                token VARCHAR(50) UNIQUE NOT NULL,
+                date_submitted VARCHAR(50) NOT NULL,
+                is_anonim INTEGER NOT NULL DEFAULT 1,
+                category VARCHAR(100) NOT NULL,
+                title VARCHAR(200) NOT NULL,
+                incident_date VARCHAR(50),
+                location VARCHAR(200) NOT NULL,
+                description TEXT NOT NULL,
+                file_name VARCHAR(255),
+                file_data TEXT,
+                status VARCHAR(50) NOT NULL DEFAULT 'Diajukan',
+                reporter_name VARCHAR(100),
+                reporter_nik VARCHAR(50),
+                reporter_email VARCHAR(100),
+                reporter_hp VARCHAR(50)
+            );
+        `);
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS report_history (
+                id SERIAL PRIMARY KEY,
+                report_token VARCHAR(50) NOT NULL REFERENCES reports(token) ON DELETE CASCADE,
+                status VARCHAR(50) NOT NULL,
+                note TEXT,
+                date VARCHAR(50) NOT NULL,
+                is_user_msg INTEGER NOT NULL DEFAULT 0,
+                file_name VARCHAR(255),
+                file_data TEXT
+            );
+        `);
+
+        // Check and create indexes safely
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_reports_token ON reports(token);`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_history_token ON report_history(report_token);`);
+
+        writeLog('SYSTEM', 'PostgreSQL database initialized successfully.');
+    } catch (err) {
+        writeLog('ERROR', `Failed to initialize PostgreSQL database: ${formatError(err)}`);
+        throw err;
+    } finally {
+        client.release();
+    }
+}
+
+/* ==========================================================================
+   AUTO-MIGRATION: Import existing reports.json/reports_backup.json data to PostgreSQL
+   ========================================================================== */
+
+async function migrateFromJson() {
+    let jsonPath = path.join(__dirname, 'reports.json');
+    if (!fs.existsSync(jsonPath)) {
+        jsonPath = path.join(__dirname, 'reports_backup.json');
+    }
     
-    if (!fs.existsSync(JSON_FILE)) return;
+    if (!fs.existsSync(jsonPath)) return;
     
     try {
-        const jsonData = fs.readFileSync(JSON_FILE, 'utf8');
-        const reports = JSON.parse(jsonData || '[]');
-        
-        if (reports.length === 0) return;
-        
-        // Check if database already has data
-        const count = db.prepare('SELECT COUNT(*) as count FROM reports').get();
-        if (count.count > 0) {
-            writeLog('INFO', `Database already has ${count.count} reports. Skipping JSON migration.`);
+        const countRes = await pool.query('SELECT COUNT(*) as count FROM reports');
+        const count = parseInt(countRes.rows[0].count, 10);
+        if (count > 0) {
+            writeLog('INFO', `Database already has ${count} reports. Skipping JSON migration.`);
             return;
         }
         
-        writeLog('INFO', `Migrating ${reports.length} reports from reports.json to SQLite...`);
+        const jsonData = fs.readFileSync(jsonPath, 'utf8');
+        const reports = JSON.parse(jsonData || '[]');
+        if (reports.length === 0) return;
         
-        const insertReport = db.prepare(`
-            INSERT OR IGNORE INTO reports (token, date_submitted, is_anonim, category, title, incident_date, location, description, file_name, file_data, status, reporter_name, reporter_nik, reporter_email, reporter_hp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
+        writeLog('INFO', `Migrating ${reports.length} reports from ${path.basename(jsonPath)} to PostgreSQL...`);
         
-        const insertHistory = db.prepare(`
-            INSERT INTO report_history (report_token, status, note, date, is_user_msg, file_name, file_data)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        `);
-        
-        const migrate = db.transaction(() => {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            
+            const insertReportText = `
+                INSERT INTO reports (token, date_submitted, is_anonim, category, title, incident_date, location, description, file_name, file_data, status, reporter_name, reporter_nik, reporter_email, reporter_hp)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                ON CONFLICT (token) DO NOTHING
+            `;
+            
+            const insertHistoryText = `
+                INSERT INTO report_history (report_token, status, note, date, is_user_msg, file_name, file_data)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `;
+            
             for (const report of reports) {
-                insertReport.run(
+                await client.query(insertReportText, [
                     report.token,
                     report.dateSubmitted,
                     report.isAnonim ? 1 : 0,
@@ -146,12 +165,11 @@ function migrateFromJson() {
                     report.reporterNik || null,
                     report.reporterEmail || null,
                     report.reporterHp || null
-                );
+                ]);
                 
-                // Migrate history entries
                 if (report.history && Array.isArray(report.history)) {
                     for (const hist of report.history) {
-                        insertHistory.run(
+                        await client.query(insertHistoryText, [
                             report.token,
                             hist.status,
                             hist.note || null,
@@ -159,37 +177,52 @@ function migrateFromJson() {
                             hist.isUserMsg ? 1 : 0,
                             hist.fileName || null,
                             hist.fileData || null
-                        );
+                        ]);
                     }
                 }
             }
-        });
-        
-        migrate();
-        writeLog('INFO', `Successfully migrated ${reports.length} reports from JSON to SQLite.`);
-        
-        // Rename old JSON file as backup
-        const backupPath = path.join(__dirname, 'reports_backup.json');
-        fs.renameSync(JSON_FILE, backupPath);
-        writeLog('INFO', `Old reports.json renamed to reports_backup.json as backup.`);
-        
+            
+            await client.query('COMMIT');
+            writeLog('INFO', `Successfully migrated ${reports.length} reports from JSON to PostgreSQL.`);
+            
+            // Rename reports.json if it exists to avoid running migration from it next time
+            const oldJson = path.join(__dirname, 'reports.json');
+            if (fs.existsSync(oldJson)) {
+                fs.renameSync(oldJson, path.join(__dirname, 'reports_backup.json'));
+                writeLog('INFO', `Old reports.json renamed to reports_backup.json as backup.`);
+            }
+        } catch (txErr) {
+            await client.query('ROLLBACK');
+            throw txErr;
+        } finally {
+            client.release();
+        }
     } catch (err) {
-        writeLog('ERROR', `Failed to migrate from JSON: ${err.message}`);
+        writeLog('ERROR', `Failed to migrate from JSON to PostgreSQL: ${formatError(err)}`);
     }
 }
 
-migrateFromJson();
+// Database Startup IIFE
+(async () => {
+    try {
+        await initDb();
+        await migrateFromJson();
+    } catch (err) {
+        writeLog('ERROR', `Database startup failed: ${formatError(err)}`);
+    }
+})();
 
 /* ==========================================================================
    DATABASE QUERY HELPERS
    ========================================================================== */
 
 // Get a single report with its history (formatted as the frontend expects)
-function getReportByToken(token) {
-    const report = db.prepare('SELECT * FROM reports WHERE UPPER(token) = UPPER(?)').get(token);
-    if (!report) return null;
+async function getReportByToken(token) {
+    const reportRes = await pool.query('SELECT * FROM reports WHERE UPPER(token) = UPPER($1)', [token]);
+    if (reportRes.rows.length === 0) return null;
+    const report = reportRes.rows[0];
     
-    const history = db.prepare('SELECT * FROM report_history WHERE report_token = ? ORDER BY id ASC').all(report.token);
+    const historyRes = await pool.query('SELECT * FROM report_history WHERE report_token = $1 ORDER BY id ASC', [report.token]);
     
     return {
         token: report.token,
@@ -207,7 +240,7 @@ function getReportByToken(token) {
         reporterNik: report.reporter_nik,
         reporterEmail: report.reporter_email,
         reporterHp: report.reporter_hp,
-        history: history.map(h => ({
+        history: historyRes.rows.map(h => ({
             status: h.status,
             note: h.note,
             date: h.date,
@@ -219,35 +252,40 @@ function getReportByToken(token) {
 }
 
 // Get all reports with their history
-function getAllReports() {
-    const reports = db.prepare('SELECT * FROM reports ORDER BY date_submitted DESC').all();
-    const historyStmt = db.prepare('SELECT * FROM report_history WHERE report_token = ? ORDER BY id ASC');
+async function getAllReports() {
+    const reportsRes = await pool.query('SELECT * FROM reports ORDER BY date_submitted DESC');
+    const reports = reportsRes.rows;
     
-    return reports.map(report => ({
-        token: report.token,
-        dateSubmitted: report.date_submitted,
-        isAnonim: report.is_anonim === 1,
-        category: report.category,
-        title: report.title,
-        incidentDate: report.incident_date,
-        location: report.location,
-        description: report.description,
-        fileName: report.file_name,
-        fileData: report.file_data,
-        status: report.status,
-        reporterName: report.reporter_name,
-        reporterNik: report.reporter_nik,
-        reporterEmail: report.reporter_email,
-        reporterHp: report.reporter_hp,
-        history: historyStmt.all(report.token).map(h => ({
-            status: h.status,
-            note: h.note,
-            date: h.date,
-            isUserMsg: h.is_user_msg === 1,
-            fileName: h.file_name,
-            fileData: h.file_data
-        }))
-    }));
+    const result = [];
+    for (const report of reports) {
+        const historyRes = await pool.query('SELECT * FROM report_history WHERE report_token = $1 ORDER BY id ASC', [report.token]);
+        result.push({
+            token: report.token,
+            dateSubmitted: report.date_submitted,
+            isAnonim: report.is_anonim === 1,
+            category: report.category,
+            title: report.title,
+            incidentDate: report.incident_date,
+            location: report.location,
+            description: report.description,
+            fileName: report.file_name,
+            fileData: report.file_data,
+            status: report.status,
+            reporterName: report.reporter_name,
+            reporterNik: report.reporter_nik,
+            reporterEmail: report.reporter_email,
+            reporterHp: report.reporter_hp,
+            history: historyRes.rows.map(h => ({
+                status: h.status,
+                note: h.note,
+                date: h.date,
+                isUserMsg: h.is_user_msg === 1,
+                fileName: h.file_name,
+                fileData: h.file_data
+            }))
+        });
+    }
+    return result;
 }
 
 /* ==========================================================================
@@ -415,13 +453,14 @@ function authenticateToken(req, res, next) {
    ========================================================================== */
 
 // PUBLIC API: Health check & diagnostics (for Railway deployment verification)
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
     try {
-        const reportCount = db.prepare('SELECT COUNT(*) as count FROM reports').get();
+        const reportCountRes = await pool.query('SELECT COUNT(*) as count FROM reports');
+        const count = parseInt(reportCountRes.rows[0].count, 10);
         res.json({
             status: 'OK',
-            database: 'SQLite connected',
-            reports: reportCount.count,
+            database: 'PostgreSQL connected',
+            reports: count,
             telegram: {
                 botToken: process.env.TELEGRAM_BOT_TOKEN ? 'configured' : 'using fallback',
                 chatId: process.env.TELEGRAM_CHAT_ID || '-1003944424009 (fallback)'
@@ -433,28 +472,30 @@ app.get('/api/health', (req, res) => {
             }
         });
     } catch (err) {
-        res.status(500).json({ status: 'ERROR', message: err.message });
+        writeLog('ERROR', `Health check failed: ${err.message}`);
+        res.status(500).json({ status: 'ERROR', database: 'PostgreSQL connection failed', message: err.message });
     }
 });
 
 // PUBLIC API: Get report statistics for home landing page
-app.get('/api/reports/stats', (req, res) => {
+app.get('/api/reports/stats', async (req, res) => {
     try {
-        const stats = db.prepare(`
+        const statsRes = await pool.query(`
             SELECT 
                 COUNT(*) as total,
                 SUM(CASE WHEN status IN ('Diverifikasi', 'Diajukan') THEN 1 ELSE 0 END) as pending,
                 SUM(CASE WHEN status = 'Ditindaklanjuti' THEN 1 ELSE 0 END) as process,
                 SUM(CASE WHEN status = 'Selesai' THEN 1 ELSE 0 END) as resolved
             FROM reports
-        `).get();
+        `);
+        const stats = statsRes.rows[0];
         
         res.json({
             success: true,
-            total: stats.total,
-            pending: stats.pending,
-            process: stats.process,
-            resolved: stats.resolved
+            total: parseInt(stats.total || 0, 10),
+            pending: parseInt(stats.pending || 0, 10),
+            process: parseInt(stats.process || 0, 10),
+            resolved: parseInt(stats.resolved || 0, 10)
         });
     } catch (err) {
         writeLog('ERROR', `Error in GET /api/reports/stats: ${err.message}`);
@@ -463,7 +504,7 @@ app.get('/api/reports/stats', (req, res) => {
 });
 
 // PUBLIC API: Submit new complaint
-app.post('/api/reports', (req, res) => {
+app.post('/api/reports', async (req, res) => {
     try {
         const report = req.body;
         
@@ -475,24 +516,20 @@ app.post('/api/reports', (req, res) => {
         }
         
         // Check for token duplicates
-        const existing = db.prepare('SELECT token FROM reports WHERE token = ?').get(report.token);
-        if (existing) {
+        const existingRes = await pool.query('SELECT token FROM reports WHERE token = $1', [report.token]);
+        if (existingRes.rows.length > 0) {
             return res.status(409).json({ success: false, message: 'Token aduan duplikat' });
         }
         
-        // Insert report into database
-        const insertReport = db.prepare(`
-            INSERT INTO reports (token, date_submitted, is_anonim, category, title, incident_date, location, description, file_name, file_data, status, reporter_name, reporter_nik, reporter_email, reporter_hp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        
-        const insertHistory = db.prepare(`
-            INSERT INTO report_history (report_token, status, note, date, is_user_msg)
-            VALUES (?, ?, ?, ?, ?)
-        `);
-        
-        const transaction = db.transaction(() => {
-            insertReport.run(
+        // Insert report and history in a transaction
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            
+            await client.query(`
+                INSERT INTO reports (token, date_submitted, is_anonim, category, title, incident_date, location, description, file_name, file_data, status, reporter_name, reporter_nik, reporter_email, reporter_hp)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            `, [
                 report.token,
                 report.dateSubmitted,
                 report.isAnonim ? 1 : 0,
@@ -508,16 +545,24 @@ app.post('/api/reports', (req, res) => {
                 report.reporterNik || null,
                 report.reporterEmail || null,
                 report.reporterHp || null
-            );
+            ]);
             
             // Insert initial history entry
             if (report.history && report.history.length > 0) {
                 const h = report.history[0];
-                insertHistory.run(report.token, h.status, h.note, h.date, 0);
+                await client.query(`
+                    INSERT INTO report_history (report_token, status, note, date, is_user_msg)
+                    VALUES ($1, $2, $3, $4, $5)
+                `, [report.token, h.status, h.note, h.date, 0]);
             }
-        });
-        
-        transaction();
+            
+            await client.query('COMMIT');
+        } catch (txErr) {
+            await client.query('ROLLBACK');
+            throw txErr;
+        } finally {
+            client.release();
+        }
         
         writeLog('INFO', `New report registered: ${report.token} (${report.isAnonim ? 'Anonim' : 'Identitas Asli'})`);
         
@@ -533,10 +578,10 @@ app.post('/api/reports', (req, res) => {
 });
 
 // PUBLIC API: Track report (Secure Data Protection)
-app.get('/api/reports/track/:token', (req, res) => {
+app.get('/api/reports/track/:token', async (req, res) => {
     try {
         const token = req.params.token.toUpperCase();
-        const report = getReportByToken(token);
+        const report = await getReportByToken(token);
         
         if (!report) {
             writeLog('INFO', `Tracking failed: Token not found: ${token}`);
@@ -572,7 +617,7 @@ app.get('/api/reports/track/:token', (req, res) => {
 });
 
 // PUBLIC API: Whistleblower submits comment
-app.post('/api/reports/comment', (req, res) => {
+app.post('/api/reports/comment', async (req, res) => {
     try {
         const { token, note, date, isUserMsg } = req.body;
         
@@ -581,15 +626,16 @@ app.post('/api/reports/comment', (req, res) => {
         }
         
         // Check if report exists
-        const report = db.prepare('SELECT token, status FROM reports WHERE token = ?').get(token);
-        if (!report) {
+        const reportRes = await pool.query('SELECT token, status FROM reports WHERE token = $1', [token]);
+        if (reportRes.rows.length === 0) {
             return res.status(404).json({ success: false, message: 'Token tidak ditemukan' });
         }
+        const report = reportRes.rows[0];
         
-        db.prepare(`
+        await pool.query(`
             INSERT INTO report_history (report_token, status, note, date, is_user_msg)
-            VALUES (?, ?, ?, ?, ?)
-        `).run(token, report.status, note, date, isUserMsg ? 1 : 0);
+            VALUES ($1, $2, $3, $4, $5)
+        `, [token, report.status, note, date, isUserMsg ? 1 : 0]);
         
         writeLog('INFO', `Whistleblower comment added to report: ${token}`);
         res.json({ success: true });
@@ -638,9 +684,9 @@ app.post('/api/admin/logout', authenticateToken, (req, res) => {
 });
 
 // SECURE API: Get all reports (Requires session token validation)
-app.get('/api/admin/reports', authenticateToken, (req, res) => {
+app.get('/api/admin/reports', authenticateToken, async (req, res) => {
     try {
-        const reports = getAllReports();
+        const reports = await getAllReports();
         res.json({ success: true, reports: reports });
     } catch (err) {
         writeLog('ERROR', `Error in GET /api/admin/reports: ${err.message}`);
@@ -649,7 +695,7 @@ app.get('/api/admin/reports', authenticateToken, (req, res) => {
 });
 
 // SECURE API: Admin update status (Requires session token validation with optional file attachment)
-app.post('/api/admin/reports/update-status', authenticateToken, (req, res) => {
+app.post('/api/admin/reports/update-status', authenticateToken, async (req, res) => {
     try {
         const { token, status, note, date, fileName, fileData } = req.body;
         
@@ -674,22 +720,30 @@ app.post('/api/admin/reports/update-status', authenticateToken, (req, res) => {
         }
         
         // Check if report exists
-        const report = db.prepare('SELECT token FROM reports WHERE token = ?').get(token);
-        if (!report) {
+        const reportRes = await pool.query('SELECT token FROM reports WHERE token = $1', [token]);
+        if (reportRes.rows.length === 0) {
             return res.status(404).json({ success: false, message: 'Pengaduan tidak ditemukan' });
         }
         
         // Update status and add history entry in a transaction
-        const transaction = db.transaction(() => {
-            db.prepare('UPDATE reports SET status = ? WHERE token = ?').run(status, token);
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
             
-            db.prepare(`
+            await client.query('UPDATE reports SET status = $1 WHERE token = $2', [status, token]);
+            
+            await client.query(`
                 INSERT INTO report_history (report_token, status, note, date, is_user_msg, file_name, file_data)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `).run(token, status, note, date, 0, fileName || null, fileData || null);
-        });
-        
-        transaction();
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `, [token, status, note, date, 0, fileName || null, fileData || null]);
+            
+            await client.query('COMMIT');
+        } catch (txErr) {
+            await client.query('ROLLBACK');
+            throw txErr;
+        } finally {
+            client.release();
+        }
         
         writeLog('INFO', `Admin updated status of report ${token} to ${status}${fileName ? ' with attachment: ' + fileName : ''}`);
         res.json({ success: true });
@@ -701,14 +755,20 @@ app.post('/api/admin/reports/update-status', authenticateToken, (req, res) => {
 });
 
 // SECURE API: Admin resets database (Requires session token validation)
-app.post('/api/admin/reports/reset', authenticateToken, (req, res) => {
+app.post('/api/admin/reports/reset', authenticateToken, async (req, res) => {
     try {
-        const transaction = db.transaction(() => {
-            db.prepare('DELETE FROM report_history').run();
-            db.prepare('DELETE FROM reports').run();
-        });
-        
-        transaction();
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query('DELETE FROM report_history');
+            await client.query('DELETE FROM reports');
+            await client.query('COMMIT');
+        } catch (txErr) {
+            await client.query('ROLLBACK');
+            throw txErr;
+        } finally {
+            client.release();
+        }
         
         writeLog('INFO', 'Database was cleared/reset by Admin.');
         res.json({ success: true });
@@ -725,19 +785,19 @@ app.get('*', (req, res) => {
 });
 
 // Graceful shutdown: close database connection
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
     writeLog('SYSTEM', 'Server shutting down, closing database...');
-    db.close();
+    await pool.end();
     process.exit(0);
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
     writeLog('SYSTEM', 'Server shutting down, closing database...');
-    db.close();
+    await pool.end();
     process.exit(0);
 });
 
 // Start the server securely
 app.listen(PORT, () => {
-    writeLog('SYSTEM', `WBS Inspektorat Padang server is listening on port ${PORT} (SQLite database)`);
+    writeLog('SYSTEM', `WBS Inspektorat Padang server is listening on port ${PORT} (PostgreSQL database)`);
 });
