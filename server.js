@@ -82,6 +82,12 @@ db.exec(`
 
 writeLog('SYSTEM', 'SQLite database initialized successfully.');
 
+// Startup diagnostics: log environment variable status
+writeLog('SYSTEM', `ENV CHECK — TELEGRAM_BOT_TOKEN: ${process.env.TELEGRAM_BOT_TOKEN ? 'SET ✓' : 'NOT SET (using fallback)'}`);
+writeLog('SYSTEM', `ENV CHECK — TELEGRAM_CHAT_ID: ${process.env.TELEGRAM_CHAT_ID ? 'SET ✓' : 'NOT SET (using fallback)'}`);
+writeLog('SYSTEM', `ENV CHECK — ADMIN_USERNAME: ${process.env.ADMIN_USERNAME ? 'SET ✓' : 'NOT SET (using fallback)'}`);
+writeLog('SYSTEM', `ENV CHECK — PORT: ${process.env.PORT || '8000 (default)'}`);
+
 /* ==========================================================================
    AUTO-MIGRATION: Import existing reports.json data into SQLite
    ========================================================================== */
@@ -243,13 +249,16 @@ function getAllReports() {
    ========================================================================== */
 
 function sendTelegramNotification(report) {
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const primaryChatId = process.env.TELEGRAM_CHAT_ID;
+    // Use env vars with hardcoded fallbacks to ensure Telegram always works
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || "8960174423:AAGRTippEoPzFt5XJxkzKIBqWi3-rgYJZuo";
+    const primaryChatId = process.env.TELEGRAM_CHAT_ID || "-1003944424009";
     
     if (!botToken || !primaryChatId) {
         writeLog('WARN', 'Telegram bot token or chat ID not configured. Skipping notification.');
         return;
     }
+    
+    writeLog('INFO', `Attempting Telegram notification to chat ID: ${primaryChatId} for token: ${report.token}`);
     
     const chatIds = [primaryChatId];
     
@@ -398,6 +407,29 @@ function authenticateToken(req, res, next) {
 /* ==========================================================================
    PUBLIC API ENDPOINTS
    ========================================================================== */
+
+// PUBLIC API: Health check & diagnostics (for Railway deployment verification)
+app.get('/api/health', (req, res) => {
+    try {
+        const reportCount = db.prepare('SELECT COUNT(*) as count FROM reports').get();
+        res.json({
+            status: 'OK',
+            database: 'SQLite connected',
+            reports: reportCount.count,
+            telegram: {
+                botToken: process.env.TELEGRAM_BOT_TOKEN ? 'configured' : 'using fallback',
+                chatId: process.env.TELEGRAM_CHAT_ID || '-1003944424009 (fallback)'
+            },
+            environment: {
+                nodeVersion: process.version,
+                platform: process.platform,
+                port: PORT
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ status: 'ERROR', message: err.message });
+    }
+});
 
 // PUBLIC API: Get report statistics for home landing page
 app.get('/api/reports/stats', (req, res) => {
