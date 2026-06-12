@@ -293,9 +293,8 @@ async function getAllReports() {
    ========================================================================== */
 
 function sendTelegramNotification(report) {
-    // Use env vars with hardcoded fallbacks to ensure Telegram always works
-    const botToken = process.env.TELEGRAM_BOT_TOKEN || "8960174423:AAG6fMbo1ZZaTCoLVKAmWOSdNllK-7hqdsM";
-    const primaryChatId = process.env.TELEGRAM_CHAT_ID || "-1003944424009";
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const primaryChatId = process.env.TELEGRAM_CHAT_ID;
     
     if (!botToken || !primaryChatId) {
         writeLog('WARN', 'Telegram bot token or chat ID not configured. Skipping notification.');
@@ -462,8 +461,8 @@ app.get('/api/health', async (req, res) => {
             database: 'PostgreSQL connected',
             reports: count,
             telegram: {
-                botToken: process.env.TELEGRAM_BOT_TOKEN ? 'configured' : 'using fallback',
-                chatId: process.env.TELEGRAM_CHAT_ID || '-1003944424009 (fallback)'
+                botToken: process.env.TELEGRAM_BOT_TOKEN ? 'configured' : 'not configured',
+                chatId: process.env.TELEGRAM_CHAT_ID ? 'configured' : 'not configured'
             },
             environment: {
                 nodeVersion: process.version,
@@ -655,8 +654,13 @@ app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
     
     // Server-Side Authentication using environment variables
-    const adminUser = process.env.ADMIN_USERNAME || 'admin';
-    const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
+    const adminUser = process.env.ADMIN_USERNAME;
+    const adminPass = process.env.ADMIN_PASSWORD;
+    
+    if (!adminUser || !adminPass) {
+        writeLog('ERROR', 'Admin credentials are not configured in environment variables');
+        return res.status(500).json({ success: false, message: 'Autentikasi admin belum dikonfigurasi di server' });
+    }
     
     if (username === adminUser && password === adminPass) {
         // Generate secure cryptographically random session token
