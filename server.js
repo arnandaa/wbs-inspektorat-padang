@@ -11,8 +11,14 @@ const Database = require('better-sqlite3');
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-const DB_PATH = path.join(__dirname, 'wbs_database.db');
+const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'wbs_database.db');
 const LOG_FILE = path.join(__dirname, 'server.log');
+
+// Ensure parent directory of DB_PATH exists (crucial when using Docker/Railway Volumes)
+const dbDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+}
 
 // Cryptographically secure active sessions storage (in-memory)
 const activeSessions = new Set();
@@ -250,7 +256,7 @@ function getAllReports() {
 
 function sendTelegramNotification(report) {
     // Use env vars with hardcoded fallbacks to ensure Telegram always works
-    const botToken = process.env.TELEGRAM_BOT_TOKEN || "8960174423:AAGRTippEoPzFt5XJxkzKIBqWi3-rgYJZuo";
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || "8960174423:AAG6fMbo1ZZaTCoLVKAmWOSdNllK-7hqdsM";
     const primaryChatId = process.env.TELEGRAM_CHAT_ID || "-1003944424009";
     
     if (!botToken || !primaryChatId) {
