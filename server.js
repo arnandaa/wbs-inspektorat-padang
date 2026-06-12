@@ -472,8 +472,8 @@ app.get('/api/health', async (req, res) => {
             }
         });
     } catch (err) {
-        writeLog('ERROR', `Health check failed: ${err.message}`);
-        res.status(500).json({ status: 'ERROR', database: 'PostgreSQL connection failed', message: err.message });
+        writeLog('ERROR', `Health check failed: ${formatError(err)}`);
+        res.status(500).json({ status: 'ERROR', database: 'PostgreSQL connection failed', message: formatError(err) });
     }
 });
 
